@@ -1,9 +1,10 @@
 #include <cstdio>
 #include <SDL2/SDL.h>
 #include "record.hpp"
+#include "fx.hpp"
 
 // https://wiki.nesdev.com/w/index.php/NSF
-// TODO: bankswitching, PAL, ...
+// TODO: bankswitching, length counter, PAL, ...
 
 
 enum {
@@ -93,19 +94,12 @@ void mix(float out[2]) {
                 pulse.sweep_shift   = value & 0x7;
                 pulse.sweep_negate  = value & 0x8;
             }
-            if (state.is_set[2 + i * 4]) {
-                uint8_t value = state.reg[2 + i * 4];
-                pulse.period &= ~0xff;
-                pulse.period |= value;
-                pulse.pitch = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
+            if (state.is_set[2 + i * 4] || state.is_set[3 + i * 4]) {
+                pulse.period = state.reg[2 + i * 4] | ((state.reg[3 + i * 4] & 0x7) << 8);
+                pulse.pitch  = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
             }
-            if (state.is_set[3 + i * 4]) {
-                uint8_t value = state.reg[3 + i * 4];
-                pulse.period &= ~0xff00;
-                pulse.period |= (value & 0x7) << 8;
-                pulse.pitch = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
-                pulse.env.start();
-            }
+
+            if (state.is_set[3 + i * 4]) pulse.env.start();
         }
 
         // triangle
@@ -193,11 +187,11 @@ void mix(float out[2]) {
 }
 
 template <class T>
-T clamp(T const& v, T const& min=0, T const& max=1) {
+T clamp(T const& v, T const& min, T const& max) {
     return std::max(min, std::min(max, v));
 }
 
-void callback(void* u, Uint8* stream, int len) {
+void audio_callback(void* u, Uint8* stream, int len) {
     short* buf = (short*) stream;
     for (; len > 0; len -= 4) {
         float f[2];
@@ -206,6 +200,23 @@ void callback(void* u, Uint8* stream, int len) {
         *buf++ = clamp<int>(f[1] * 7000, -32768, 32767);
     }
 }
+
+
+struct App : fx::App {
+    const char* title() const { return "nsf-monitor"; }
+
+    void key(int code) override {
+    }
+
+    void textinput(char const* text) override {
+    }
+
+    void update() override {
+        fx::set_color(0, 0, 0);
+        fx::clear();
+
+    }
+};
 
 
 int main(int argc, char** argv) {
@@ -220,13 +231,10 @@ int main(int argc, char** argv) {
     }
 
 
-    SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, 1024, 0, 0, &callback };
+    SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, 1024, 0, 0, &audio_callback };
     SDL_OpenAudio(&spec, nullptr);
     SDL_PauseAudio(0);
-    printf("playing...\n");
-    getchar();
-    printf("done.\n");
-    SDL_Quit();
 
-    return 0;
+    App app;
+    return fx::run(app);
 }
