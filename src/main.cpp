@@ -108,6 +108,7 @@ void mix(float out[2]) {
             int   period = state.reg[0xa] | ((state.reg[0xb] & 0x7) << 8);
             tri.pitch    = APU_RATE / float(32 * (period + 1)) / MIXRATE;
             tri.vol      = state.reg[0x8] & 0x7f ? 1 : 0;
+            if (period == 0) tri.vol = 0;
         }
 
         // noise
