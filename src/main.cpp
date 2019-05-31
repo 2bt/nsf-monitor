@@ -314,6 +314,8 @@ struct App : fx::App {
             if (n >= (int) record.states.size()) break;
             auto const& state = record.states[n];
 
+            int x = (n - start_frame) * scale_x;
+
             for (int i = 0; i < 3; ++i) {
                 if (!active[i]) continue;
 
@@ -321,10 +323,6 @@ struct App : fx::App {
                 float speed  = APU_RATE / float(16 * (period + 1)) / 440;
                 float pitch  = std::log2(speed) * 12;
                 if (i == 2) pitch -= 12;
-
-                int x = (n - start_frame) * scale_x;
-                int y = -pitch * scale_y + fx::screen_height() / 2;
-
 
                 int vol;
                 if (i < 2) vol = state.reg[i * 4] & 0x0f;
@@ -335,6 +333,7 @@ struct App : fx::App {
                 if (i == 1) fx::set_color(v/3, v, v/3);
                 if (i == 2) fx::set_color(v/3, v/3, v);
 
+                int y = -pitch * scale_y + fx::screen_height() / 2;
                 fx::draw_rectangle(true, x, y, scale_x, 1 + scale_y - 2);
 
                 // sweep
@@ -348,6 +347,20 @@ struct App : fx::App {
                     }
                 }
             }
+
+            // noise
+            if (active[3]) {
+                int  period = state.reg[0xe] & 0x0f;
+                bool mode   = state.reg[0xe] & 0x80;
+                int  vol    = state.reg[0xc] & 0x0f;
+                int  v      = 200 * std::pow(vol / 15.0, 0.5);
+                if (mode) fx::set_color(v / 3, v, v);
+                else      fx::set_color(v, v, v);
+
+                int y = (period - 49) * scale_y + fx::screen_height() / 2;
+                fx::draw_rectangle(true, x, y, scale_x, 1 + scale_y - 2);
+            }
+
          }
 
         // cursor
