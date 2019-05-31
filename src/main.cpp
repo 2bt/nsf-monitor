@@ -40,7 +40,7 @@ struct {
     struct {
         float pos;
         int   period;
-        float pitch;
+        float speed;
         float duty;
         Env   env;
         bool  sweep_enabled;
@@ -52,7 +52,7 @@ struct {
 
     struct {
         float pos;
-        float pitch;
+        float speed;
         float vol;
     } tri;
 
@@ -69,13 +69,37 @@ struct {
 
 Record record;
 
+bool active[4] = { 1, 1, 1, 1 };
+bool playing   = true;
+int  frame;
+
+
+template <class T>
+T clamp(T const& v, T const& min, T const& max) {
+    return std::max(min, std::min(max, v));
+}
+
+
+void tick() {
+    const Uint8* ks = SDL_GetKeyboardState(nullptr);
+    bool ctrl = ks[SDL_SCANCODE_LCTRL] | ks[SDL_SCANCODE_RCTRL];
+    if (ctrl) return;
+
+    bool shift = ks[SDL_SCANCODE_LSHIFT] | ks[SDL_SCANCODE_RSHIFT];
+    int speed = shift ? 5 : 1;
+
+    if (ks[SDL_SCANCODE_LEFT])  frame -= speed;
+    else if (ks[SDL_SCANCODE_RIGHT]) frame += speed;
+    else if (playing) ++frame;
+    frame = clamp<int>(frame, 0, record.states.size());
+}
+
 
 void mix(float out[2]) {
     static size_t sample = 0;
-    static size_t frame = 0;
-    auto const& state = record.states[frame];
     if (sample == 0) {
-        if (++frame > record.states.size()) frame = 0;
+        auto const& state = record.states[frame];
+        tick();
 
         // pulse
         for (int i = 0; i < 2; ++i) {
@@ -97,7 +121,7 @@ void mix(float out[2]) {
             }
             if (state.is_set[2 + i * 4] || state.is_set[3 + i * 4]) {
                 pulse.period = state.reg[2 + i * 4] | ((state.reg[3 + i * 4] & 0x7) << 8);
-                pulse.pitch  = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
+                pulse.speed  = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
             }
 
             if (state.is_set[3 + i * 4]) pulse.env.start();
@@ -107,14 +131,14 @@ void mix(float out[2]) {
         {
             auto& tri = apu.tri;
             int   period = state.reg[0xa] | ((state.reg[0xb] & 0x7) << 8);
-            tri.pitch    = APU_RATE / float(32 * (period + 1)) / MIXRATE;
+            tri.speed    = APU_RATE / float(32 * (period + 1)) / MIXRATE;
             tri.vol      = state.reg[0x8] & 0x7f ? 1 : 0;
             if (period < 2) tri.vol = 0;
         }
 
         // noise
         {
-            static const int PERIOD_TABLE[16] = { 
+            static const int PERIOD_TABLE[16] = {
                 4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
             };
             auto& noise = apu.noise;
@@ -141,7 +165,7 @@ void mix(float out[2]) {
                 pulse.sweep_pos = 0;
                 int s = pulse.period >> pulse.sweep_shift;
                 pulse.period += pulse.sweep_negate ? -s : s;
-                pulse.pitch = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
+                pulse.speed = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
             }
         }
     }
@@ -152,29 +176,35 @@ void mix(float out[2]) {
     // pulse
     for (int i = 0; i < 2; ++i) {
         if (apu.pulse[i].period < 8) continue;
-        apu.pulse[i].pos += apu.pulse[i].pitch;
+        apu.pulse[i].pos += apu.pulse[i].speed;
         apu.pulse[i].pos -= (int) apu.pulse[i].pos;
 
         float amp = apu.pulse[i].pos < apu.pulse[i].duty ? -1 : 1;
         amp *= apu.pulse[i].env.get_vol();
 
         // have some stereo
-        out[0] += amp * (i ? 0.8 : 1.2);
-        out[1] += amp * (i ? 1.2 : 0.8);
+        if (active[i]) {
+            out[0] += amp * (i ? 0.8 : 1.2);
+            out[1] += amp * (i ? 1.2 : 0.8);
+        }
     }
 
     // triangle
     {
-        apu.tri.pos += apu.tri.pitch;
+        apu.tri.pos += apu.tri.speed;
         apu.tri.pos -= (int) apu.tri.pos;
         float amp = apu.tri.pos < 0.5 ? 1 - apu.tri.pos * 2: (apu.tri.pos - 0.5) * 2 - 1;
         amp *= apu.tri.vol;
-        out[0] += amp;
-        out[1] += amp;
+        if (active[2]) {
+            out[0] += amp;
+            out[1] += amp;
+        }
     }
 
     // noise
     {
+        // NOTE: this is hacky
+        // 10 * 4 == 40 == APU_RATE / MIXRATE
         for (int i = 0; i < 10; ++i) {
             apu.noise.pos += 4;
             if (++apu.noise.pos >= apu.noise.period) {
@@ -185,14 +215,11 @@ void mix(float out[2]) {
         }
         float amp = apu.noise.reg / float(1 << 14) - 1;
         amp *= apu.noise.env.get_vol() * 2;
-        out[0] += amp;
-        out[1] += amp;
+        if (active[3]) {
+            out[0] += amp;
+            out[1] += amp;
+        }
     }
-}
-
-template <class T>
-T clamp(T const& v, T const& min, T const& max) {
-    return std::max(min, std::min(max, v));
 }
 
 void audio_callback(void* u, Uint8* stream, int len) {
@@ -207,17 +234,125 @@ void audio_callback(void* u, Uint8* stream, int len) {
 
 
 struct App : fx::App {
+
+    int scale_x = 6;
+    int scale_y = 10;
+    int offset  = 0;
+    int bar     = 24;
+
+    void init() override {
+        //SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, 1024, 0, 0, &audio_callback };
+        SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, SAMPLES_PER_FRAME, 0, 0, &audio_callback };
+        SDL_OpenAudio(&spec, nullptr);
+        SDL_PauseAudio(0);
+    }
+
     const char* title() const { return "nsf-monitor"; }
 
     void key(int code) override {
+        const Uint8* ks = SDL_GetKeyboardState(nullptr);
+        bool ctrl = ks[SDL_SCANCODE_LCTRL] | ks[SDL_SCANCODE_RCTRL];
+
+        switch (code) {
+        case SDL_SCANCODE_SPACE: playing ^= 1; break;
+        case SDL_SCANCODE_LEFT: if (ctrl) frame = std::max(0, frame - 1); break;
+        case SDL_SCANCODE_RIGHT: if (ctrl) ++frame; break;
+        case SDL_SCANCODE_BACKSPACE: frame = 0; break;
+
+        case SDL_SCANCODE_PAGEDOWN: scale_y = std::max(0, scale_y - 1); break;
+        case SDL_SCANCODE_PAGEUP: ++scale_y; break;
+
+        case SDL_SCANCODE_W: ++bar; break;
+        case SDL_SCANCODE_S: --bar; break;
+        case SDL_SCANCODE_D: ++offset; break;
+        case SDL_SCANCODE_A: --offset; break;
+
+        case SDL_SCANCODE_1: active[0] ^= 1; break;
+        case SDL_SCANCODE_2: active[1] ^= 1; break;
+        case SDL_SCANCODE_3: active[2] ^= 1; break;
+        case SDL_SCANCODE_4: active[3] ^= 1; break;
+
+        default: break;
+        }
     }
 
     void textinput(char const* text) override {
+        if (text[0] == '+') ++scale_x;
+        if (text[0] == '-') scale_x = std::max(1, scale_x - 1);
     }
 
     void update() override {
         fx::set_color(0, 0, 0);
         fx::clear();
+
+        int f = frame;
+        int frames_per_screen = fx::screen_width() / scale_x;
+        int start_frame = std::max(0, f - frames_per_screen / 2);
+
+        // bars
+        // fx::set_color(50, 50, 50);
+        //int x = offset + (start_frame - offset) / bar * bar;
+        // for (int i = 0; i < 100; ++i) {
+        //     int x = (offset + i * bar - start_frame) * scale_x;
+        //     fx::draw_rectangle(true, x, 0, 1, fx::screen_height());
+        // }
+
+
+
+        for (int p = -50; p < 50; ++p) {
+
+            int c = "101201011010"[(p + 120) % 12] - '0';
+            c = 10 + c * 20;
+            fx::set_color(c, c, c);
+
+            int y = -p * scale_y + fx::screen_height() / 2;
+            fx::draw_rectangle(true, 0, y, fx::screen_width(), 1 + scale_y - 2);
+
+        }
+
+         for (int n = start_frame; n < start_frame + frames_per_screen; ++n) {
+            if (n >= (int) record.states.size()) break;
+            auto const& state = record.states[n];
+
+            for (int i = 0; i < 3; ++i) {
+                if (!active[i]) continue;
+
+                int   period = state.reg[2 + i * 4] | ((state.reg[3 + i * 4] & 0x7) << 8);
+                float speed  = APU_RATE / float(16 * (period + 1)) / 440;
+                float pitch  = std::log2(speed) * 12;
+                if (i == 2) pitch -= 12;
+
+                int x = (n - start_frame) * scale_x;
+                int y = -pitch * scale_y + fx::screen_height() / 2;
+
+
+                int vol;
+                if (i < 2) vol = state.reg[i * 4] & 0x0f;
+                else       vol = state.reg[0x8] & 0x7f ? 0xa : 0;
+
+                int v = 255 * std::pow(vol / 15.0, 0.5);
+                if (i == 0) fx::set_color(v, v/3, v/3);
+                if (i == 1) fx::set_color(v/3, v, v/3);
+                if (i == 2) fx::set_color(v/3, v/3, v);
+
+                fx::draw_rectangle(true, x, y, scale_x, 1 + scale_y - 2);
+
+                // sweep
+                if (i < 2 && (state.is_set[1 + i * 4] | state.is_set[2 + i * 4] | state.is_set[3 + i * 4])) {
+                    uint8_t value = state.reg[1 + i * 4];
+                    bool sweep_enabled = value & 0x80;
+                    bool sweep_negate  = value & 0x08;
+                    if (sweep_enabled) {
+                        if (sweep_negate) fx::draw_line(x, y - scale_y, x, y + scale_y);
+                        else              fx::draw_line(x, y, x, y + scale_y * 2);
+                    }
+                }
+            }
+         }
+
+        // cursor
+        fx::set_color(255, 255, 255);
+        fx::draw_rectangle(true, (f - start_frame) * scale_x, 0, 1, fx::screen_height());
 
     }
 };
@@ -234,10 +369,6 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-
-    SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, 1024, 0, 0, &audio_callback };
-    SDL_OpenAudio(&spec, nullptr);
-    SDL_PauseAudio(0);
 
     App app;
     return fx::run(app);

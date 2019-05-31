@@ -28,6 +28,8 @@ int run(App& app) {
 //    SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_BLEND);
     SDL_SetRenderDrawBlendMode(m_renderer, SDL_BLENDMODE_ADD);
 
+    app.init();
+
     m_running = true;
     while (m_running) {
         SDL_Event e;

@@ -3,6 +3,7 @@
 namespace fx {
     struct App {
         virtual const char* title() const { return "app"; }
+        virtual void init() {}
         virtual void key(int code) {}
         virtual void textinput(char const* text) {}
         virtual void update() {}
