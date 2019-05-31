@@ -58,6 +58,7 @@ struct {
 
     struct {
         uint16_t reg = 1;
+        bool     mode;
         int      pos;
         int      period;
         Env      env;
@@ -108,7 +109,7 @@ void mix(float out[2]) {
             int   period = state.reg[0xa] | ((state.reg[0xb] & 0x7) << 8);
             tri.pitch    = APU_RATE / float(32 * (period + 1)) / MIXRATE;
             tri.vol      = state.reg[0x8] & 0x7f ? 1 : 0;
-            if (period == 0) tri.vol = 0;
+            if (period < 2) tri.vol = 0;
         }
 
         // noise
@@ -117,7 +118,8 @@ void mix(float out[2]) {
                 4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
             };
             auto& noise = apu.noise;
-            noise.period       = PERIOD_TABLE[state.reg[0xe] % 0xf];
+            noise.period       = PERIOD_TABLE[state.reg[0xe] & 0xf];
+            noise.mode         = state.reg[0xe] & 0x80;
             noise.env.vol      = state.reg[0xc] & 0x0f;
             noise.env.is_const = state.reg[0xc] & 0x10;
             noise.env.loop     = state.reg[0xc] & 0x20;
@@ -149,6 +151,7 @@ void mix(float out[2]) {
 
     // pulse
     for (int i = 0; i < 2; ++i) {
+        if (apu.pulse[i].period < 8) continue;
         apu.pulse[i].pos += apu.pulse[i].pitch;
         apu.pulse[i].pos -= (int) apu.pulse[i].pos;
 
@@ -176,12 +179,12 @@ void mix(float out[2]) {
             apu.noise.pos += 4;
             if (++apu.noise.pos >= apu.noise.period) {
                 apu.noise.pos -= apu.noise.period;
-                int b = apu.noise.reg ^ (apu.noise.reg >> (state.reg[0xb] & 0x80 ? 6 : 1));
+                int b = apu.noise.reg ^ (apu.noise.reg >> (apu.noise.mode ? 6 : 1));
                 apu.noise.reg = (apu.noise.reg >> 1) | ((b & 1) << 14);
             }
         }
         float amp = apu.noise.reg / float(1 << 14) - 1;
-        amp *= apu.noise.env.get_vol() * 2.5;
+        amp *= apu.noise.env.get_vol() * 2;
         out[0] += amp;
         out[1] += amp;
     }
