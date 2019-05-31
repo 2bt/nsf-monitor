@@ -76,12 +76,18 @@ bool Record::load(const char* filename, int song_nr) {
         return false;
     }
 
+    if (song_nr < 0) song_nr = h->start_song;
+    this->song_nr = song_nr;
+    song_count    = h->song_count;
+    song_name     = h->song_name;
+
+
     MyCPU cpu;
     for (size_t i = sizeof(Header), j = h->load_addr; i < data.size() && j < cpu.memory.size(); ++i, ++j) {
         cpu.memory[j] = data[i];
     }
 
-    cpu.jsr(h->init_addr, song_nr >= 0 ? song_nr : h->start_song);
+    cpu.jsr(h->init_addr, song_nr);
 
     for (int m = 0; m < 60 * 60 * 10; ++m) {
         State s;

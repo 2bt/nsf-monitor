@@ -1,6 +1,7 @@
 #pragma once
 #include <cstdint>
 #include <vector>
+#include <string>
 
 struct Record {
 
@@ -10,7 +11,10 @@ struct Record {
     };
 
     std::vector<State> states;
+    std::string        song_name;
+    int                song_count;
+    int                song_nr;
 
-    bool load(const char* filename, int song_nr);
+    bool load(const char* filename, int song_nr = -1);
 
 };

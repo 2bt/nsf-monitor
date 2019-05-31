@@ -236,7 +236,7 @@ void audio_callback(void* u, Uint8* stream, int len) {
 struct App : fx::App {
 
     int scale_x = 6;
-    int scale_y = 10;
+    int scale_y = 9;
     int offset  = 0;
     int bar     = 24;
 
@@ -351,6 +351,10 @@ struct App : fx::App {
                 int  period = state.reg[0xe] & 0x0f;
                 bool mode   = state.reg[0xe] & 0x80;
                 int  vol    = state.reg[0xc] & 0x0f;
+                bool is_const = state.reg[0xc] & 0x10;
+                if (!is_const) {
+                    if (state.is_set[0xf]) vol = 0xf;
+                }
                 int  v      = 200 * std::pow(vol / 15.0, 0.5);
                 if (mode) fx::set_color(v / 3, v, v);
                 else      fx::set_color(v, v, v);
@@ -365,12 +369,19 @@ struct App : fx::App {
         fx::set_color(255, 255, 255);
         fx::draw_rectangle(true, (f - start_frame) * scale_x, 0, 1, fx::screen_height());
 
+        // state
         auto const& state = record.states[f];
         for (int i = 0; i < 16; ++i) {
-            if (state.is_set[i]) fx::set_font_color(200, 200, 200);
+            if (state.is_set[i]) fx::set_font_color(250, 250, 250);
             else                 fx::set_font_color(150, 150, 150);
             fx::printf(i % 4 * 48 + 8, fx::screen_height() - (4 - i / 4) * 24, "%02X", state.reg[i]);
         }
+
+        fx::set_font_color(250, 250, 250);
+        fx::printf(8, 8, "%s - %d/%d", record.song_name.c_str(), record.song_nr, record.song_count);
+        fx::printf(fx::screen_width() - 8 - 15 * 15, 8,      "position: %4d", f);
+        fx::printf(fx::screen_width() - 8 - 15 * 15, 8 + 24, "     bar: %4d", bar);
+
     }
 };
 
