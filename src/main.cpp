@@ -290,12 +290,10 @@ struct App : fx::App {
         int start_frame = std::max(0, f - frames_per_screen / 2);
 
         // bars
-        // fx::set_color(50, 50, 50);
-        //int x = offset + (start_frame - offset) / bar * bar;
-        // for (int i = 0; i < 100; ++i) {
-        //     int x = (offset + i * bar - start_frame) * scale_x;
-        //     fx::draw_rectangle(true, x, 0, 1, fx::screen_height());
-        // }
+        fx::set_color(50, 50, 50);
+        for (int t = -((start_frame - offset) % bar); t < frames_per_screen; t += bar) {
+             fx::draw_rectangle(true, t * scale_x, 0, 1, fx::screen_height());
+        }
 
 
 
@@ -378,10 +376,8 @@ int main(int argc, char** argv) {
     }
 
     if (!record.load(argv[1], argc == 3 ? atoi(argv[2]) : -1)) {
-        printf("error: could not open file\n");
         return 1;
     }
-
 
     App app;
     return fx::run(app);

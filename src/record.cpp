@@ -45,6 +45,7 @@ bool Record::load(const char* filename, int song_nr) {
 
     std::ifstream ifs(filename, std::ios::binary | std::ios::ate);
     if (!ifs.is_open()) {
+        printf("error: could not open file\n");
         return false;
     }
     auto pulse_pos = ifs.tellg();
@@ -68,6 +69,12 @@ bool Record::load(const char* filename, int song_nr) {
     printf("bank:        %x %x %x %x %x %x %x %x\n",
             h->bank[0], h->bank[1], h->bank[2], h->bank[3], h->bank[4], h->bank[5], h->bank[6], h->bank[7]);
     printf("chip flags:  %x\n", h->chip_flags);
+
+    int b = h->bank[0] | h->bank[1] | h->bank[2] | h->bank[3] | h->bank[4] | h->bank[5] | h->bank[6] | h->bank[7];
+    if (b) {
+        printf("error: backswitching not yet supported\n");
+        return false;
+    }
 
     MyCPU cpu;
     for (size_t i = sizeof(Header), j = h->load_addr; i < data.size() && j < cpu.memory.size(); ++i, ++j) {
