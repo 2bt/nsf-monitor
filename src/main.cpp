@@ -297,7 +297,7 @@ struct App : fx::App {
 
 
 
-        for (int p = -50; p < 50; ++p) {
+        for (int p = -48; p < 50; ++p) {
 
             int c = "101201011010"[(p + 120) % 12] - '0';
             c = 10 + c * 20;
@@ -365,6 +365,12 @@ struct App : fx::App {
         fx::set_color(255, 255, 255);
         fx::draw_rectangle(true, (f - start_frame) * scale_x, 0, 1, fx::screen_height());
 
+        auto const& state = record.states[f];
+        for (int i = 0; i < 16; ++i) {
+            if (state.is_set[i]) fx::set_font_color(200, 200, 200);
+            else                 fx::set_font_color(150, 150, 150);
+            fx::printf(i % 4 * 48 + 8, fx::screen_height() - (4 - i / 4) * 24, "%02X", state.reg[i]);
+        }
     }
 };
 
