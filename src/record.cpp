@@ -109,7 +109,6 @@ bool Record::load(const char* filename, int nr) {
             if (addr >= 0x4000 && addr < 0x4010)
             s.is_set[addr - 0x4000] = true;
         });
-        printf("%02x\n", cpu.ram[0x4015]);
 
         for (int i = 0; i < 16; ++i) s.reg[i] = cpu.ram[0x4000 + i];
         states.emplace_back(s);
