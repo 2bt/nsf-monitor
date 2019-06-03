@@ -30,26 +30,26 @@ public:
         callback = f;        
         CPU::jsr(npc, na);
     }
-    std::array<uint8_t, 0x8000>  rom = {};
-    std::array<uint8_t, 0x10000> memory = {};
+    std::array<uint8_t, 0x8000> rom = {};
+    std::array<uint8_t, 0x8000> ram = {};
 
 protected:
     void setmem(uint16_t addr, uint8_t value) override {
         if (addr >= 0x8000) {
-            int base = memory[0x5ff0 + (addr >> 12)] << 12;
+            int base = ram[0x5ff0 + (addr >> 12)] << 12;
             rom[base + (addr & 0x0fff)] = value;
             return;
         }
-        memory[addr] = value;
+        ram[addr] = value;
         //if (addr >= 0x5ff8 && addr < 0x6000) printf("BANK %x %x\n", addr, value);
         if (callback) callback(addr, value);
     }
     uint8_t getmem(uint16_t addr) override {
         if (addr >= 0x8000) {
-            int base = memory[0x5ff0 + (addr >> 12)] << 12;
+            int base = ram[0x5ff0 + (addr >> 12)] << 12;
             return rom[base + (addr & 0x0fff)];
         }
-        return memory[addr];
+        return ram[addr];
     }
 private:
     std::function<void(uint16_t, uint8_t)> callback;
@@ -95,7 +95,7 @@ bool Record::load(const char* filename, int nr) {
 
     // init banks
     int b = h->bank[0] | h->bank[1] | h->bank[2] | h->bank[3] | h->bank[4] | h->bank[5] | h->bank[6] | h->bank[7];
-    for (int i = 0; i < 8; ++i) cpu.memory[0x5ff8 + i] = b ? h->bank[i] & 0x7 : i;
+    for (int i = 0; i < 8; ++i) cpu.ram[0x5ff8 + i] = b ? h->bank[i] & 0x7 : i;
     size_t j = h->load_addr & (b ? 0x0fff : 0x7fff);
     for (size_t i = sizeof(Header); i < data.size() && j < cpu.rom.size(); ++i, ++j) {
         cpu.rom[j] = data[i];
@@ -109,7 +109,9 @@ bool Record::load(const char* filename, int nr) {
             if (addr >= 0x4000 && addr < 0x4010)
             s.is_set[addr - 0x4000] = true;
         });
-        for (int i = 0; i < 16; ++i) s.reg[i] = cpu.memory[0x4000 + i];
+        printf("%02x\n", cpu.ram[0x4015]);
+
+        for (int i = 0; i < 16; ++i) s.reg[i] = cpu.ram[0x4000 + i];
         states.emplace_back(s);
     }
 

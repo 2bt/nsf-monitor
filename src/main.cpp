@@ -134,9 +134,9 @@ void mix(float out[2]) {
         {
             auto& tri = apu.tri;
             int   period = state.reg[0xa] | ((state.reg[0xb] & 0x7) << 8);
-            tri.speed    = APU_RATE / float(32 * (period + 1)) / MIXRATE;
             tri.gate     = state.reg[0x8] & 0x7f;
-            if (period < 2) tri.gate = false;
+            if (period > 1) tri.speed = APU_RATE / float(32 * (period + 1)) / MIXRATE;
+            else            tri.gate = false;
         }
 
         // noise
@@ -200,8 +200,8 @@ void mix(float out[2]) {
         apu.tri.pos -= (int) apu.tri.pos;
         float p = std::floor(apu.tri.pos * 32) / 32;
         float amp = p < 0.5 ? 1 - p * 4: (p - 0.5) * 4 - 1;
-        if (apu.tri.gate) apu.tri.vol = std::min<float>(1, apu.tri.vol + 0.01);
-        else              apu.tri.vol = std::max<float>(0, apu.tri.vol - 0.01);
+        if (apu.tri.gate) apu.tri.vol = std::min<float>(1, apu.tri.vol + 0.017);
+        else              apu.tri.vol = std::max<float>(0, apu.tri.vol - 0.017);
         amp *= apu.tri.vol * 1.2;
         if (active[2]) {
             out[0] += amp;
@@ -243,10 +243,11 @@ void audio_callback(void* u, Uint8* stream, int len) {
 
 struct App : fx::App {
 
-    int scale_x = 4;
-    int scale_y = 6;
-    int offset  = 0;
-    int bar     = 24;
+    int  scale_x = 4;
+    int  scale_y = 6;
+    int  offset  = 0;
+    int  bar     = 24;
+    bool show_bar = true;
 
     void init() override {
         //SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, 1024, 0, 0, &audio_callback };
@@ -267,9 +268,10 @@ struct App : fx::App {
         case SDL_SCANCODE_RIGHT: if (ctrl) ++frame; break;
         case SDL_SCANCODE_BACKSPACE: frame = 0; break;
 
-        case SDL_SCANCODE_PAGEDOWN: scale_y = std::max(0, scale_y - 1); break;
+        case SDL_SCANCODE_PAGEDOWN: scale_y = std::max(2, scale_y - 1); break;
         case SDL_SCANCODE_PAGEUP: ++scale_y; break;
 
+        case SDL_SCANCODE_B: show_bar ^= 1; break;
         case SDL_SCANCODE_W: ++bar; break;
         case SDL_SCANCODE_S: --bar; break;
         case SDL_SCANCODE_D: ++offset; break;
@@ -297,10 +299,12 @@ struct App : fx::App {
         int frames_per_screen = fx::screen_width() / scale_x;
         int start_frame = std::max(0, f - frames_per_screen / 2);
 
-        // bars
-        fx::set_color(50, 50, 50);
-        for (int t = -((start_frame - offset) % bar); t < frames_per_screen; t += bar) {
-             fx::draw_rectangle(true, t * scale_x, 0, 1, fx::screen_height());
+        // bar
+        if (show_bar) {
+            fx::set_color(50, 50, 50);
+            for (int t = -((start_frame - offset) % bar); t < frames_per_screen; t += bar) {
+                 fx::draw_rectangle(true, t * scale_x, 0, 1, fx::screen_height());
+            }
         }
 
 
