@@ -54,6 +54,7 @@ struct {
         float pos;
         float speed;
         float vol;
+        bool  gate;
     } tri;
 
     struct {
@@ -132,8 +133,8 @@ void mix(float out[2]) {
             auto& tri = apu.tri;
             int   period = state.reg[0xa] | ((state.reg[0xb] & 0x7) << 8);
             tri.speed    = APU_RATE / float(32 * (period + 1)) / MIXRATE;
-            tri.vol      = state.reg[0x8] & 0x7f ? 1 : 0;
-            if (period < 2) tri.vol = 0;
+            tri.gate     = state.reg[0x8] & 0x7f;
+            if (period < 2) tri.gate = false;
         }
 
         // noise
@@ -193,8 +194,11 @@ void mix(float out[2]) {
     {
         apu.tri.pos += apu.tri.speed;
         apu.tri.pos -= (int) apu.tri.pos;
-        float amp = apu.tri.pos < 0.5 ? 1 - apu.tri.pos * 2: (apu.tri.pos - 0.5) * 2 - 1;
-        amp *= apu.tri.vol;
+        float p = std::floor(apu.tri.pos * 32) / 32;
+        float amp = p < 0.5 ? 1 - p * 4: (p - 0.5) * 4 - 1;
+        if (apu.tri.gate) apu.tri.vol = std::min<float>(1, apu.tri.vol + 0.01);
+        else              apu.tri.vol = std::max<float>(0, apu.tri.vol - 0.01);
+        amp *= apu.tri.vol * 1.2;
         if (active[2]) {
             out[0] += amp;
             out[1] += amp;

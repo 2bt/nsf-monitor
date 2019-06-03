@@ -156,7 +156,6 @@ void draw_rectangle(bool fill, int x, int y, int w, int h) {
     else      SDL_RenderDrawRect(m_renderer, &r);
 }
 
-
 void set_font_color(int r, int g, int b) {
     SDL_SetTextureColorMod(m_font_tex, r, g, b);
 }
