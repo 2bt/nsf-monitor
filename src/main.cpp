@@ -87,9 +87,9 @@ void tick() {
     if (ctrl) return;
 
     bool shift = ks[SDL_SCANCODE_LSHIFT] | ks[SDL_SCANCODE_RSHIFT];
-    int speed = shift ? 5 : 1;
+    int  speed = shift ? 5 : 1;
 
-    if (ks[SDL_SCANCODE_LEFT])  frame -= speed;
+    if (ks[SDL_SCANCODE_LEFT])       frame -= speed;
     else if (ks[SDL_SCANCODE_RIGHT]) frame += speed;
     else if (playing) ++frame;
     frame = clamp<int>(frame, 0, record.states.size());
@@ -119,10 +119,12 @@ void mix(float out[2]) {
                 pulse.sweep_period  = ((value >> 4) & 0x7) + 1;
                 pulse.sweep_shift   = value & 0x7;
                 pulse.sweep_negate  = value & 0x8;
+                pulse.sweep_pos     = 0;
             }
             if (state.is_set[2 + i * 4] || state.is_set[3 + i * 4]) {
                 pulse.period = state.reg[2 + i * 4] | ((state.reg[3 + i * 4] & 0x7) << 8);
                 pulse.speed  = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
+                pulse.sweep_pos = 0;
             }
 
             if (state.is_set[3 + i * 4]) pulse.env.start();
@@ -164,9 +166,11 @@ void mix(float out[2]) {
             if (!pulse.sweep_enabled) continue;
             if (++pulse.sweep_pos >= pulse.sweep_period) {
                 pulse.sweep_pos = 0;
-                int s = pulse.period >> pulse.sweep_shift;
-                pulse.period += pulse.sweep_negate ? -s : s;
-                pulse.speed = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
+                if (pulse.sweep_shift > 0) {
+                    int s = pulse.period >> pulse.sweep_shift;
+                    pulse.period += pulse.sweep_negate ? -s - (i == 0) : s;
+                    pulse.speed = APU_RATE / float(16 * (pulse.period + 1)) / MIXRATE;
+                }
             }
         }
     }
@@ -218,7 +222,7 @@ void mix(float out[2]) {
             }
         }
         float amp = apu.noise.reg / float(1 << 14) - 1;
-        amp *= apu.noise.env.get_vol() * 2;
+        amp *= apu.noise.env.get_vol() * 1.5;
         if (active[3]) {
             out[0] += amp;
             out[1] += amp;
@@ -349,9 +353,10 @@ struct App : fx::App {
                 // sweep
                 if (i < 2 && (state.is_set[1 + i * 4] | state.is_set[2 + i * 4] | state.is_set[3 + i * 4])) {
                     uint8_t value = state.reg[1 + i * 4];
-                    bool sweep_enabled = value & 0x80;
-                    bool sweep_negate  = value & 0x08;
-                    if (sweep_enabled) {
+                    bool    sweep_enabled = value & 0x80;
+                    bool    sweep_negate  = value & 0x08;
+                    uint8_t sweep_shift   = value & 0x7;
+                    if (sweep_enabled && sweep_shift > 0) {
                         if (sweep_negate) fx::draw_line(x, y - scale_y, x, y + scale_y);
                         else              fx::draw_line(x, y, x, y + scale_y * 2);
                     }
