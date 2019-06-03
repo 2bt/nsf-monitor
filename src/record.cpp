@@ -30,17 +30,33 @@ public:
         callback = f;        
         CPU::jsr(npc, na);
     }
+    std::array<uint8_t, 0x8000>  rom = {};
+    std::array<uint8_t, 0x10000> memory = {};
+
 protected:
     void setmem(uint16_t addr, uint8_t value) override {
+        if (addr >= 0x8000) {
+            int base = memory[0x5ff8 + (addr >> 12)] << 12;
+            rom[base + (addr & 0x7fff)] = value;
+            return;
+        }
         memory[addr] = value;
+        if (addr >= 0x5ff8 and addr < 0x6000) printf("BANK %x %x\n", addr, value);
         if (callback) callback(addr, value);
+    }
+    uint8_t getmem(uint16_t addr) override {
+        if (addr >= 0x8000) {
+            int base = memory[0x5ff8 + (addr >> 12)] << 12;
+            return rom[base + (addr & 0x7fff)];
+        }
+        return memory[addr];
     }
 private:
     std::function<void(uint16_t, uint8_t)> callback;
 };
 
 
-bool Record::load(const char* filename, int song_nr) {
+bool Record::load(const char* filename, int nr) {
     states.clear();
 
     std::ifstream ifs(filename, std::ios::binary | std::ios::ate);
@@ -70,21 +86,19 @@ bool Record::load(const char* filename, int song_nr) {
             h->bank[0], h->bank[1], h->bank[2], h->bank[3], h->bank[4], h->bank[5], h->bank[6], h->bank[7]);
     printf("chip flags:  %x\n", h->chip_flags);
 
-    int b = h->bank[0] | h->bank[1] | h->bank[2] | h->bank[3] | h->bank[4] | h->bank[5] | h->bank[6] | h->bank[7];
-    if (b) {
-        printf("error: backswitching not yet supported\n");
-        return false;
-    }
-
-    if (song_nr < 0) song_nr = h->start_song;
-    this->song_nr = song_nr;
-    song_count    = h->song_count;
-    song_name     = h->song_name;
+    song_nr    = nr >= 0 ? nr : h->start_song;
+    song_count = h->song_count;
+    song_name  = h->song_name;
 
 
     MyCPU cpu;
-    for (size_t i = sizeof(Header), j = h->load_addr; i < data.size() && j < cpu.memory.size(); ++i, ++j) {
-        cpu.memory[j] = data[i];
+
+    // init banks
+    int b = h->bank[0] | h->bank[1] | h->bank[2] | h->bank[3] | h->bank[4] | h->bank[5] | h->bank[6] | h->bank[7];
+    for (int i = 0; i < 8; ++i) cpu.memory[0x5ff8 + i] = b ? h->bank[i] & 0x7 : 1;
+    size_t j = h->load_addr & (b ? 0x0fff : 0x7fff);
+    for (size_t i = sizeof(Header); i < data.size() && j < cpu.rom.size(); ++i, ++j) {
+        cpu.rom[j] = data[i];
     }
 
     cpu.jsr(h->init_addr, song_nr);

@@ -7,16 +7,9 @@ class CPU {
 public:
     void jsr(uint16_t npc, uint8_t na);
 
-    std::array<uint8_t, 65536> memory;
-
 protected:
-    virtual uint8_t getmem(uint16_t addr) {
-        return memory[addr];
-    }
-
-    virtual void setmem(uint16_t addr, uint8_t value) {
-        memory[addr] = value;
-    }
+    virtual uint8_t getmem(uint16_t addr) = 0;
+    virtual void setmem(uint16_t addr, uint8_t value) = 0;
 
 private:
     uint8_t getaddr(int mode);
