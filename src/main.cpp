@@ -327,8 +327,16 @@ struct App : fx::App {
                 if (i == 2) pitch -= 12;
 
                 int vol;
-                if (i < 2) vol = state.reg[i * 4] & 0x0f;
-                else       vol = state.reg[0x8] & 0x7f ? 0xa : 0;
+                if (i < 2) {
+                    vol = state.reg[i * 4] & 0x0f;
+                    bool is_const = state.reg[i * 4] & 0x10;
+                    if (!is_const) {
+                        if (state.is_set[i * 4 + 3]) vol = 0xf;
+                    }
+                }
+                else {
+                    vol = state.reg[0x8] & 0x7f ? 0xa : 0;
+                }
 
                 int v = 255 * std::pow(vol / 15.0, 0.5);
                 if (i == 0) fx::set_color(v, v/3, v/3);
