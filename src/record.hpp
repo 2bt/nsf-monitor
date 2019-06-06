@@ -51,6 +51,6 @@ struct Record {
     int                song_count;
     int                song_nr;
 
-    bool load(const char* filename, int song_nr = -1);
+    bool load(const char* filename, int song_nr = 0);
 
 };

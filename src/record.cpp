@@ -52,7 +52,7 @@ bool Record::load(const char* filename, int nr) {
             h->bank[0], h->bank[1], h->bank[2], h->bank[3], h->bank[4], h->bank[5], h->bank[6], h->bank[7]);
     printf("chip flags:  %x\n", h->chip_flags);
 
-    song_nr    = nr >= 0 ? nr : h->start_song;
+    song_nr    = nr > 0 ? nr : h->start_song;
     song_count = h->song_count;
     song_name  = h->song_name;
 
@@ -66,7 +66,7 @@ bool Record::load(const char* filename, int nr) {
         cpu.rom[j] = data[i];
     }
 
-    cpu.jsr(h->init_addr, song_nr);
+    cpu.jsr(h->init_addr, song_nr - 1);
 
     for (int m = 0; m < 60 * 60 * 10; ++m) {
         State s;
