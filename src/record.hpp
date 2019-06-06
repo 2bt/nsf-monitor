@@ -12,22 +12,21 @@ public:
         callback = f;
         CPU::jsr(npc, na);
     }
-    std::array<uint8_t, 0x8000> rom = {};
+    std::vector<uint8_t>        rom = std::vector<uint8_t>(0x8000);
     std::array<uint8_t, 0x8000> ram = {};
 
     void setmem(uint16_t addr, uint8_t value) override {
         if (addr >= 0x8000) {
-            uint16_t base = ram[0x5ff0 + (addr >> 12)] << 12;
+            int base = ram[0x5ff0 + (addr >> 12)] << 12;
             rom[base + (addr & 0x0fff)] = value;
             return;
         }
-        ram[addr] = value;
-        //if (addr >= 0x5ff8 && addr < 0x6000) printf("BANK %x %x\n", addr, value);
         if (callback) callback(addr, value);
+        ram[addr] = value;
     }
     uint8_t getmem(uint16_t addr) override {
         if (addr >= 0x8000) {
-            uint16_t base = ram[0x5ff0 + (addr >> 12)] << 12;
+            int base = ram[0x5ff0 + (addr >> 12)] << 12;
             return rom[base + (addr & 0x0fff)];
         }
         return ram[addr];
@@ -43,6 +42,7 @@ struct Record {
     struct State {
         std::array<uint8_t, 22> is_set = {};
         std::array<uint8_t, 22> reg    = {};
+        std::array<uint8_t, 8>  bank   = {};
     };
 
     MyCPU              cpu;

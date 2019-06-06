@@ -61,7 +61,8 @@ bool Record::load(const char* filename, int nr) {
     int b = h->bank[0] | h->bank[1] | h->bank[2] | h->bank[3] | h->bank[4] | h->bank[5] | h->bank[6] | h->bank[7];
     for (int i = 0; i < 8; ++i) cpu.ram[0x5ff8 + i] = b ? h->bank[i] & 0x7 : i;
     size_t j = h->load_addr & (b ? 0x0fff : 0x7fff);
-    for (size_t i = sizeof(Header); i < data.size() && j < cpu.rom.size(); ++i, ++j) {
+    for (size_t i = sizeof(Header); i < data.size(); ++i, ++j) {
+        if (j >= cpu.rom.size()) cpu.rom.resize(cpu.rom.size() + 0x1000);
         cpu.rom[j] = data[i];
     }
 
@@ -74,6 +75,7 @@ bool Record::load(const char* filename, int nr) {
             s.is_set[addr - 0x4000] = true;
         });
         for (size_t i = 0; i < s.reg.size(); ++i) s.reg[i] = cpu.ram[0x4000 + i];
+        for (size_t i = 0; i < s.bank.size(); ++i) s.bank[i] = cpu.ram[0x5ff0 + i];
         states.emplace_back(s);
     }
 

@@ -164,6 +164,9 @@ void mix(float out[2]) {
 
         // dmc
         {
+            // set banks
+            for (size_t i = 0; i < state.bank.size(); ++i) record.cpu.ram[0x5ff0 + i] = state.bank[i];
+
             auto& dmc = apu.dmc;
             if (state.is_set[0x15]) dmc.active = state.reg[0x15] & 0x10;
             if (state.is_set[0x11]) dmc.output = state.reg[0x11];
