@@ -1,7 +1,5 @@
-#include <functional>
 #include <fstream>
 #include "record.hpp"
-#include "cpu.hpp"
 
 struct Header {
     char     magic[5];
@@ -22,38 +20,6 @@ struct Header {
     uint8_t  reserved;
     uint8_t  size[3];
 } __attribute__((packed));
-
-
-class MyCPU : public CPU {
-public:
-    void jsr(uint16_t npc, uint8_t na, std::function<void(uint16_t, uint8_t)> f = nullptr) {
-        callback = f;        
-        CPU::jsr(npc, na);
-    }
-    std::array<uint8_t, 0x8000> rom = {};
-    std::array<uint8_t, 0x8000> ram = {};
-
-protected:
-    void setmem(uint16_t addr, uint8_t value) override {
-        if (addr >= 0x8000) {
-            int base = ram[0x5ff0 + (addr >> 12)] << 12;
-            rom[base + (addr & 0x0fff)] = value;
-            return;
-        }
-        ram[addr] = value;
-        //if (addr >= 0x5ff8 && addr < 0x6000) printf("BANK %x %x\n", addr, value);
-        if (callback) callback(addr, value);
-    }
-    uint8_t getmem(uint16_t addr) override {
-        if (addr >= 0x8000) {
-            int base = ram[0x5ff0 + (addr >> 12)] << 12;
-            return rom[base + (addr & 0x0fff)];
-        }
-        return ram[addr];
-    }
-private:
-    std::function<void(uint16_t, uint8_t)> callback;
-};
 
 
 bool Record::load(const char* filename, int nr) {
@@ -91,8 +57,6 @@ bool Record::load(const char* filename, int nr) {
     song_name  = h->song_name;
 
 
-    MyCPU cpu;
-
     // init banks
     int b = h->bank[0] | h->bank[1] | h->bank[2] | h->bank[3] | h->bank[4] | h->bank[5] | h->bank[6] | h->bank[7];
     for (int i = 0; i < 8; ++i) cpu.ram[0x5ff8 + i] = b ? h->bank[i] & 0x7 : i;
@@ -106,11 +70,10 @@ bool Record::load(const char* filename, int nr) {
     for (int m = 0; m < 60 * 60 * 10; ++m) {
         State s;
         cpu.jsr(h->play_addr, 0, [&s](uint16_t addr, uint8_t value) {
-            if (addr >= 0x4000 && addr < 0x4010)
+            if (addr >= 0x4000 && addr < 0x4000 + s.is_set.size())
             s.is_set[addr - 0x4000] = true;
         });
-
-        for (int i = 0; i < 16; ++i) s.reg[i] = cpu.ram[0x4000 + i];
+        for (size_t i = 0; i < s.reg.size(); ++i) s.reg[i] = cpu.ram[0x4000 + i];
         states.emplace_back(s);
     }
 

@@ -65,12 +65,21 @@ struct {
         Env      env;
     } noise;
 
+    struct {
+        bool     active;
+        int      addr;
+        int      length;
+        int      pos;
+        int      period;
+        int      output;
+        float    cycles;
+    } dmc;
 } apu;
 
 
 Record record;
 
-bool active[4] = { 1, 1, 1, 1 };
+bool active[5] = { 1, 1, 1, 1, 1 };
 bool playing   = true;
 int  frame;
 
@@ -152,6 +161,22 @@ void mix(float out[2]) {
             noise.env.loop     = state.reg[0xc] & 0x20;
             if (state.is_set[0xf]) apu.noise.env.start();
         }
+
+        // dmc
+        {
+            auto& dmc = apu.dmc;
+            if (state.is_set[0x15]) dmc.active = state.reg[0x15] & 0x10;
+            if (state.is_set[0x11]) dmc.output = state.reg[0x11];
+            if (state.is_set[0x10]) {
+                static const int PERIOD_TABLE[16] = {
+                    428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
+                };
+                dmc.period = PERIOD_TABLE[state.reg[0x10] & 0xf];
+                dmc.pos    = 0;
+            }
+            if (state.is_set[0x12]) dmc.addr = 0xc000 + state.reg[0x12] * 64;
+            if (state.is_set[0x13]) dmc.length = (state.reg[0x13] * 16 + 1) * 8;
+        }
     }
     // quater frame envelope
     if (sample % (SAMPLES_PER_FRAME / 4) == 0) {
@@ -211,19 +236,34 @@ void mix(float out[2]) {
 
     // noise
     {
-        // NOTE: this is hacky
-        // 10 * 4 == 40 == APU_RATE / MIXRATE
-        for (int i = 0; i < 10; ++i) {
-            apu.noise.pos += 4;
-            if (++apu.noise.pos >= apu.noise.period) {
-                apu.noise.pos -= apu.noise.period;
-                int b = apu.noise.reg ^ (apu.noise.reg >> (apu.noise.mode ? 6 : 1));
-                apu.noise.reg = (apu.noise.reg >> 1) | ((b & 1) << 14);
-            }
+        apu.noise.pos += APU_RATE / MIXRATE;
+        while (apu.noise.pos >= apu.noise.period) {
+            apu.noise.pos -= apu.noise.period;
+            int b = apu.noise.reg ^ (apu.noise.reg >> (apu.noise.mode ? 6 : 1));
+            apu.noise.reg = (apu.noise.reg >> 1) | ((b & 1) << 14);
         }
         float amp = apu.noise.reg / float(1 << 14) - 1;
         amp *= apu.noise.env.get_vol() * 1.5;
         if (active[3]) {
+            out[0] += amp;
+            out[1] += amp;
+        }
+    }
+
+    // dmc
+    if (apu.dmc.active) {
+        auto& dmc = apu.dmc;
+        dmc.cycles += float(APU_RATE) / MIXRATE;
+        while (dmc.cycles > dmc.period) {
+            dmc.cycles -= dmc.period;
+            if (dmc.pos >= dmc.length - 1) break;
+            dmc.pos++;
+        }
+        uint8_t b = record.cpu.getmem(dmc.addr + dmc.pos / 8);
+        int d = (b >> (dmc.pos % 8)) & 1;
+        dmc.output = clamp(dmc.output + (d ? 2 : -2), 0, 127);
+        if (active[4]) {
+            float amp = (dmc.output / 127.0 - 0.5) * 3.0;
             out[0] += amp;
             out[1] += amp;
         }
@@ -281,6 +321,7 @@ struct App : fx::App {
         case SDL_SCANCODE_2: active[1] ^= 1; break;
         case SDL_SCANCODE_3: active[2] ^= 1; break;
         case SDL_SCANCODE_4: active[3] ^= 1; break;
+        case SDL_SCANCODE_5: active[4] ^= 1; break;
 
         default: break;
         }
@@ -392,10 +433,10 @@ struct App : fx::App {
 
         // state
         auto const& state = record.states[f];
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 22; ++i) {
             if (state.is_set[i]) fx::set_font_color(250, 250, 250);
             else                 fx::set_font_color(150, 150, 150);
-            fx::printf(i % 4 * 48 + 8, fx::screen_height() - (4 - i / 4) * 24, "%02X", state.reg[i]);
+            fx::printf(i % 4 * 48 + 8, fx::screen_height() - (6 - i / 4) * 24, "%02X", state.reg[i]);
         }
 
         fx::set_font_color(250, 250, 250);

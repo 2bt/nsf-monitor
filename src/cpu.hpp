@@ -6,8 +6,8 @@
 class CPU {
 public:
     void jsr(uint16_t npc, uint8_t na);
+    virtual ~CPU() {}
 
-protected:
     virtual uint8_t getmem(uint16_t addr) = 0;
     virtual void setmem(uint16_t addr, uint8_t value) = 0;
 
@@ -22,6 +22,6 @@ private:
     void    parse(uint8_t opc);
 
     int      cycles;
-    uint8_t  a, x, y, s, p;
     uint16_t pc;
+    uint8_t  a, x, y, s, p;
 };
