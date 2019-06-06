@@ -437,6 +437,7 @@ struct App : fx::App {
         // state
         auto const& state = record.states[f];
         for (int i = 0; i < 22; ++i) {
+            if (i / 4 < 5 && !active[i / 4]) continue;
             if (state.is_set[i]) fx::set_font_color(250, 250, 250);
             else                 fx::set_font_color(150, 150, 150);
             fx::printf(i % 4 * 48 + 8, fx::screen_height() - (6 - i / 4) * 24, "%02X", state.reg[i]);
