@@ -1,8 +1,9 @@
 #include <fstream>
+#include <cstring>
 #include "record.hpp"
 
 struct Header {
-    char     magic[5];
+    uint8_t  magic[5];
     uint8_t  version;
     uint8_t  song_count;
     uint8_t  start_song;
@@ -30,12 +31,16 @@ bool Record::load(const char* filename, int nr) {
         printf("error: could not open file\n");
         return false;
     }
-    auto pulse_pos = ifs.tellg();
-    std::vector<uint8_t> data(pulse_pos);
+    auto pos = ifs.tellg();
+    std::vector<uint8_t> data(pos);
     ifs.seekg(0, std::ios::beg);
-    ifs.read((char*) data.data(), pulse_pos);
+    ifs.read((char*) data.data(), pos);
 
     Header* h = (Header*) data.data();
+    if (memcmp(h->magic, "NESM\x1a", 5) != 0) {
+        printf("error: wrong file format\n");
+        return false;
+    }
     printf("version:     %d\n", h->version);
     printf("song count:  %d\n", h->song_count);
     printf("start song:  %d\n", h->start_song);
@@ -66,8 +71,13 @@ bool Record::load(const char* filename, int nr) {
         cpu.rom[j] = data[i];
     }
 
+    // set status register
+    cpu.rom[0x4015] = 0x0f;
+
+    // init song
     cpu.jsr(h->init_addr, song_nr - 1);
 
+    // play song
     for (int m = 0; m < 60 * 60 * 10; ++m) {
         State s;
         cpu.jsr(h->play_addr, 0, [&s](uint16_t addr, uint8_t value) {
