@@ -18,7 +18,7 @@ A NSF player with piano-roll-like visualization.
         <td>Toggle APU channels.</td>
     </tr>
 	<tr>
-        <td><code>left</code>/<td><code>right</code></td>
+        <td><code>left</code>/<code>right</code></td>
         <td>
             Move through the song.<br/>
             Hold <code>shift</code> to move faster.<br/>
@@ -30,11 +30,11 @@ A NSF player with piano-roll-like visualization.
         <td>Jump to the beginning of the song.</td>
     </tr>
 	<tr>
-        <td><code>+</code>/<td><code>-</code></td>
+        <td><code>+</code>/<code>-</code></td>
         <td>Zoom time.</td>
     </tr>
 	<tr>
-        <td><code>page down</code>/<td><code>page up</code></td>
+        <td><code>page down</code>/<code>page up</code></td>
         <td>Zoom pitch.</td>
     </tr>
 	<tr>
