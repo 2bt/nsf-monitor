@@ -498,7 +498,9 @@ void CPU::parse(uint8_t opc) {
         setflags(FLAG_N, a & 0x80);
         break;
 
-    default: break;
+    default:
+        printf("cpu: unknown opcode: %02x\n", opc);
+        break;
     }
 }
 
