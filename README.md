@@ -10,15 +10,15 @@ A NSF player with piano-roll-like visualization.
 
 <table>
 	<tr>
-        <td><code>space</code></td>
+        <td><code>SPACE</code></td>
         <td>Toggle pause.</td>
     </tr>
 	<tr>
-        <td><code>1</code> - <code>5</code></td>
+        <td><code>1</code>/<code>2</code>/<code>3</code>/<code>4</code>/<code>5</code></td>
         <td>Toggle APU channels.</td>
     </tr>
 	<tr>
-        <td><code>left</code>/<code>right</code></td>
+        <td><code>LEFT</code>/<code>RIGHT</code></td>
         <td>
             Move through the song.<br/>
             Hold <code>shift</code> to move faster.<br/>
@@ -26,7 +26,7 @@ A NSF player with piano-roll-like visualization.
         </td>
     </tr>
 	<tr>
-        <td><code>backspace</code></td>
+        <td><code>BACKSPACE</code></td>
         <td>Jump to the beginning of the song.</td>
     </tr>
 	<tr>
@@ -34,15 +34,15 @@ A NSF player with piano-roll-like visualization.
         <td>Zoom time.</td>
     </tr>
 	<tr>
-        <td><code>page down</code>/<code>page up</code></td>
+        <td><code>PAGE DOWN</code>/<code>PAGE UP</code></td>
         <td>Zoom pitch.</td>
     </tr>
 	<tr>
-        <td><code>b</code></td>
+        <td><code>B</code></td>
         <td>Toggle bars.</td>
     </tr>
 	<tr>
-        <td><code>w</code>/<code>s</code>/<code>a</code>/<code>d</code></td>
+        <td><code>W</code>/<code>S</code>/<code>A</code>/<code>D</code></td>
         <td>Change bar offset/widdth.</td>
     </tr>
 </table>
