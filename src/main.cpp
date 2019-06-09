@@ -205,6 +205,7 @@ void mix(float out[2]) {
     if (++sample >= SAMPLES_PER_FRAME) sample = 0;
 
     out[0] = out[1] = 0;
+    if (!playing) return;
 
     // pulse
     for (int i = 0; i < 2; ++i) {
