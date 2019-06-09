@@ -31,11 +31,11 @@ A NSF player with piano-roll-like visualization.
     </tr>
 	<tr>
         <td><code>+</code>/<code>-</code></td>
-        <td>Zoom time.</td>
+        <td>Time zoom.</td>
     </tr>
 	<tr>
         <td><code>PAGE DOWN</code>/<code>PAGE UP</code></td>
-        <td>Zoom pitch.</td>
+        <td>Pitch zoom.</td>
     </tr>
 	<tr>
         <td><code>B</code></td>
@@ -43,7 +43,7 @@ A NSF player with piano-roll-like visualization.
     </tr>
 	<tr>
         <td><code>W</code>/<code>S</code>/<code>A</code>/<code>D</code></td>
-        <td>Change bar offset/widdth.</td>
+        <td>Change bar offset/width.</td>
     </tr>
 </table>
 
