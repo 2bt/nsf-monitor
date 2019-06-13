@@ -2,8 +2,19 @@ NSF monitor
 ===========
 
 A NSF player with piano-roll-like visualization.
+The APU emulation is not awesome but it works fine for all of my favourite music titles.
+NSF files can be downloaded [here](https://www.zophar.net/music/nintendo-nes-nsf).
 
 ![image](screenshot.png)
+
+Each channel is shown in a certain color:
+<table>
+	<tr><td>pulse 1</td><td>red</td></tr>
+	<tr><td>pulse 2</td><td>green</td></tr>
+	<tr><td>triangle</td><td>blue</td></tr>
+	<tr><td>noise</td><td>white</td></tr>
+	<tr><td>DMC</td><td>-</td></tr>
+</table>
 
 
 ## Controls
@@ -11,7 +22,7 @@ A NSF player with piano-roll-like visualization.
 <table>
 	<tr>
         <td><code>SPACE</code></td>
-        <td>Toggle pause.</td>
+        <td>Toggle playback.</td>
     </tr>
 	<tr>
         <td><code>1</code>/<code>2</code>/<code>3</code>/<code>4</code>/<code>5</code></td>
@@ -21,8 +32,8 @@ A NSF player with piano-roll-like visualization.
         <td><code>LEFT</code>/<code>RIGHT</code></td>
         <td>
             Move through the song.<br/>
-            Hold <code>shift</code> to move faster.<br/>
-            Hold <code>ctrl</code> to move frame by frame.
+            Hold <code>SHIFT</code> to move faster.<br/>
+            Hold <code>CTRL</code> to move frame by frame.
         </td>
     </tr>
 	<tr>
