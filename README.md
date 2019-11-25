@@ -5,6 +5,9 @@ A NSF player with piano-roll-like visualization.
 The APU emulation is not awesome but it works fine for all of my favourite music titles.
 NSF files can be downloaded [here](https://www.zophar.net/music/nintendo-nes-nsf).
 
+If you like it, you may also like [SID monitor](https://github.com/2bt/SID-monitor).
+
+
 ![image](screenshot.png)
 
 Each channel is shown in a certain color:
