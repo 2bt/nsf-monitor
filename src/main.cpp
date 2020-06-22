@@ -288,7 +288,7 @@ void audio_callback(void* u, Uint8* stream, int len) {
 struct App : fx::App {
 
     int  scale_x = 4;
-    int  scale_y = 6;
+    int  scale_y = 8;
     int  offset  = 0;
     int  bar     = 24;
     bool show_bar = true;
