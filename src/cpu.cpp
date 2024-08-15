@@ -1,62 +1,64 @@
 // this code is based on kb's 6502 code in tinysid, i think.
 #include "cpu.hpp"
-
-#define FLAG_N 128
-#define FLAG_V 64
-#define FLAG_B 16
-#define FLAG_D 8
-#define FLAG_I 4
-#define FLAG_Z 2
-#define FLAG_C 1
-
+#include <cstdio>
 
 enum {
-	ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
-	CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP,
-	JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI,
-	RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXS, TYA,
-	SLO, AXS, LAX, SAX,
-	XXX,
+    FLAG_C = 1,
+    FLAG_Z = 2,
+    FLAG_I = 4,
+    FLAG_D = 8,
+    FLAG_B = 16,
+    FLAG_V = 64,
+    FLAG_N = 128,
+};
+
+enum {
+    ADC, AND, ASL, BCC, BCS, BEQ, BIT, BMI, BNE, BPL, BRK, BVC, BVS, CLC,
+    CLD, CLI, CLV, CMP, CPX, CPY, DEC, DEX, DEY, EOR, INC, INX, INY, JMP,
+    JSR, LDA, LDX, LDY, LSR, NOP, ORA, PHA, PHP, PLA, PLP, ROL, ROR, RTI,
+    RTS, SBC, SEC, SED, SEI, STA, STX, STY, TAX, TAY, TSX, TXA, TXS, TYA,
+    SLO, AXS, LAX, SAX,
+    XXX,
 };
 
 enum { IMP, IMM, ABS, ABSX, ABSY, ZP, ZPX, ZPY, IND, INDX, INDY, ACC, REL};
 
 const int OPCODE_TABLE[256] = {
-    BRK,  ORA,  XXX,  XXX,  NOP,  ORA,  ASL,  XXX,  PHP,  ORA,  ASL,  XXX,  XXX,  ORA,  ASL,  XXX,
-    BPL,  ORA,  XXX,  XXX,  NOP,  ORA,  ASL,  XXX,  CLC,  ORA,  XXX,  XXX,  XXX,  ORA,  ASL,  XXX,
-    JSR,  AND,  SLO,  XXX,  BIT,  AND,  ROL,  XXX,  PLP,  AND,  ROL,  XXX,  BIT,  AND,  ROL,  XXX,
+    BRK,  ORA,  XXX,  SLO,  NOP,  ORA,  ASL,  SLO,  PHP,  ORA,  ASL,  XXX,  XXX,  ORA,  ASL,  SLO,
+    BPL,  ORA,  XXX,  SLO,  NOP,  ORA,  ASL,  SLO,  CLC,  ORA,  XXX,  SLO,  XXX,  ORA,  ASL,  SLO,
+    JSR,  AND,  XXX,  XXX,  BIT,  AND,  ROL,  XXX,  PLP,  AND,  ROL,  XXX,  BIT,  AND,  ROL,  XXX,
     BMI,  AND,  XXX,  XXX,  NOP,  AND,  ROL,  XXX,  SEC,  AND,  XXX,  XXX,  NOP,  AND,  ROL,  XXX,
     RTI,  EOR,  XXX,  XXX,  NOP,  EOR,  LSR,  XXX,  PHA,  EOR,  LSR,  XXX,  JMP,  EOR,  LSR,  XXX,
     BVC,  EOR,  XXX,  XXX,  NOP,  EOR,  LSR,  XXX,  CLI,  EOR,  XXX,  XXX,  XXX,  EOR,  LSR,  XXX,
     RTS,  ADC,  XXX,  XXX,  NOP,  ADC,  ROR,  XXX,  PLA,  ADC,  ROR,  XXX,  JMP,  ADC,  ROR,  XXX,
     BVS,  ADC,  XXX,  XXX,  NOP,  ADC,  ROR,  XXX,  SEI,  ADC,  XXX,  XXX,  XXX,  ADC,  ROR,  XXX,
-    XXX,  STA,  NOP,  SAX,  STY,  STA,  STX,  SAX,  DEY,  XXX,  TXA,  XXX,  STY,  STA,  STX,  SAX,
+    NOP,  STA,  NOP,  SAX,  STY,  STA,  STX,  SAX,  DEY,  XXX,  TXA,  XXX,  STY,  STA,  STX,  SAX,
     BCC,  STA,  XXX,  XXX,  STY,  STA,  STX,  SAX,  TYA,  STA,  TXS,  XXX,  XXX,  STA,  XXX,  XXX,
     LDY,  LDA,  LDX,  LAX,  LDY,  LDA,  LDX,  LAX,  TAY,  LDA,  TAX,  XXX,  LDY,  LDA,  LDX,  LAX,
-    BCS,  LDA,  XXX,  LAX,  LDY,  LDA,  LDX,  XXX,  CLV,  LDA,  TSX,  XXX,  LDY,  LDA,  LDX,  XXX,
+    BCS,  LDA,  XXX,  LAX,  LDY,  LDA,  LDX,  LAX,  CLV,  LDA,  TSX,  XXX,  LDY,  LDA,  LDX,  LAX,
     CPY,  CMP,  NOP,  XXX,  CPY,  CMP,  DEC,  XXX,  INY,  CMP,  DEX,  AXS,  CPY,  CMP,  DEC,  XXX,
     BNE,  CMP,  XXX,  XXX,  NOP,  CMP,  DEC,  XXX,  CLD,  CMP,  XXX,  XXX,  XXX,  CMP,  DEC,  XXX,
     CPX,  SBC,  NOP,  XXX,  CPX,  SBC,  INC,  XXX,  INX,  SBC,  NOP,  XXX,  CPX,  SBC,  INC,  XXX,
-    BEQ,  SBC,  XXX,  XXX,  NOP,  SBC,  INC,  XXX,  SED,  SBC,  XXX,  XXX,  XXX,  SBC,  INC,  XXX
+    BEQ,  SBC,  XXX,  XXX,  NOP,  SBC,  INC,  XXX,  SED,  SBC,  XXX,  XXX,  XXX,  SBC,  INC,  XXX,
 };
 
 const int MODE_TABLE[256] = {
-    IMP,  INDX,  XXX,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  XXX,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPX,  XXX,  IMP,  ABSY,  XXX,  XXX,   XXX,   ABSX,  ABSX,  ABSX,
-    ABS,  INDX,  XXX,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  XXX,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPX,  XXX,  IMP,  ABSY,  XXX,  ABSY,  ABSX,  ABSX,  ABSX,  ABSX,
-    IMP,  INDX,  XXX,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  XXX,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPX,  XXX,  IMP,  ABSY,  XXX,  XXX,   XXX,   ABSX,  ABSX,  ABSX,
-    IMP,  INDX,  XXX,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  XXX,   IND,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPX,  XXX,  IMP,  ABSY,  XXX,  XXX,   XXX,   ABSX,  ABSX,  ABSX,
-    IMM,  INDX,  IMM,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  XXX,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPY,  XXX,  IMP,  ABSY,  ACC,  XXX,   XXX,   ABSX,  ABSX,  ABSX,
-    IMM,  INDX,  IMM,   INDX,  ZP,   ZP,   ZP,   ZP,   IMP,  IMM,   ACC,  XXX,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPY,  XXX,  IMP,  ABSY,  ACC,  XXX,   ABSX,  ABSX,  ABSY,  ABSY,
-    IMM,  INDX,  IMM,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  IMM,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPX,  XXX,  IMP,  ABSY,  ACC,  XXX,   XXX,   ABSX,  ABSX,  ABSX,
-    IMM,  INDX,  IMM,   INDX,  ZP,   ZP,   ZP,   XXX,  IMP,  IMM,   ACC,  XXX,   ABS,   ABS,   ABS,   ABS,
-    REL,  INDY,  XXX,   INDY,  ZPX,  ZPX,  ZPX,  XXX,  IMP,  ABSY,  ACC,  XXX,   XXX,   ABSX,  ABSX,  ABSX,
+    IMP,  INDX, XXX,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSX,
+    ABS,  INDX, XXX,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSX,
+    IMP,  INDX, XXX,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSX,
+    IMP,  INDX, XXX,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  IND,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSX,
+    IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSY,
+    IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPY,  ZPY,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSY, ABSY,
+    IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSX,
+    IMM,  INDX, IMM,  INDX, ZP,   ZP,   ZP,   ZP,   IMP,  IMM,  ACC,  IMM,  ABS,  ABS,  ABS,  ABS,
+    REL,  INDY, XXX,  INDY, ZPX,  ZPX,  ZPX,  ZPX,  IMP,  ABSY, ACC,  ABSY, ABSX, ABSX, ABSX, ABSX,
 };
 
 
@@ -216,7 +218,7 @@ void CPU::putaddr(int mode, uint8_t val) {
     }
 }
 
-void CPU::setflags(int flag, int cond) {
+void CPU::setflags(int flag, bool cond) {
     if (cond) p |= flag;
     else p &= ~flag;
 }
@@ -231,17 +233,18 @@ uint8_t CPU::pop() {
     return getmem(0x100 + s);
 }
 
-void CPU::branch(int flag) {
-    signed char dist;
-    dist = (signed char)getaddr(IMM);
+void CPU::branch(bool cond) {
+    int8_t dist;
+    dist = (int8_t)getaddr(IMM);
     uint16_t wval = pc + dist;
-    if (flag) {
+    if (cond) {
         cycles += ((pc & 0x100) != (wval & 0x100)) ? 2 : 1;
         pc = wval;
     }
 }
 
-void CPU::parse(uint8_t opc) {
+void CPU::parse() {
+    uint8_t opc = getmem(pc++);
     uint8_t  bval;
     uint16_t wval;
     int addr = MODE_TABLE[opc];
@@ -393,7 +396,9 @@ void CPU::parse(uint8_t opc) {
         setflags(FLAG_N, wval & 0x80);
         setflags(FLAG_C, bval & 1);
         break;
-    case NOP: break;
+    case NOP:
+        bval = getaddr(addr);
+        break;
     case ORA:
         bval = getaddr(addr);
         a |= bval;
@@ -449,7 +454,6 @@ void CPU::parse(uint8_t opc) {
     case STA: putaddr(addr, a); break;
     case STX: putaddr(addr, x); break;
     case STY: putaddr(addr, y); break;
-    case SAX: putaddr(addr, a & x); break;
     case TAX:
         x = a;
         setflags(FLAG_Z, !x);
@@ -498,7 +502,10 @@ void CPU::parse(uint8_t opc) {
         setflags(FLAG_Z, !a);
         setflags(FLAG_N, a & 0x80);
         break;
-
+    case SAX:
+        putaddr(addr, a & x);
+        break;
+    case XXX:
     default:
         printf("cpu: unknown opcode: %02x\n", opc);
         break;
@@ -515,7 +522,5 @@ void CPU::jsr(uint16_t npc, uint8_t na) {
     pc = npc;
     push(0);
     push(0);
-    while (pc) parse(getmem(pc++));
+    while (pc) parse();
 }
-
-

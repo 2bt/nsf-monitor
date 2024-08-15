@@ -16,7 +16,7 @@ Each channel is shown in a certain color:
 	<tr><td>pulse 2</td><td>green</td></tr>
 	<tr><td>triangle</td><td>blue</td></tr>
 	<tr><td>noise</td><td>white</td></tr>
-	<tr><td>DMC</td><td>-</td></tr>
+	<tr><td>DMC</td><td>yellow</td></tr>
 </table>
 
 

@@ -145,7 +145,7 @@ void mix(float out[2]) {
             int   period = state.reg[0xa] | ((state.reg[0xb] & 0x7) << 8);
             tri.gate     = state.reg[0x8] & 0x7f;
             if (period > 1) tri.speed = APU_RATE / float(32 * (period + 1)) / MIXRATE;
-            else            tri.gate = false;
+            else            tri.gate  = false;
         }
 
         // noise
@@ -218,8 +218,8 @@ void mix(float out[2]) {
 
         // have some stereo
         if (active[i]) {
-            out[0] += amp * (i ? 0.8 : 1.2);
-            out[1] += amp * (i ? 1.2 : 0.8);
+            out[i    ] += amp * 0.8;
+            out[1 - i] += amp * 1.2;
         }
     }
 
@@ -274,7 +274,7 @@ void mix(float out[2]) {
     }
 }
 
-void audio_callback(void* u, Uint8* stream, int len) {
+void audio_callback(void*, Uint8* stream, int len) {
     short* buf = (short*) stream;
     for (; len > 0; len -= 4) {
         float f[2];
@@ -287,20 +287,19 @@ void audio_callback(void* u, Uint8* stream, int len) {
 
 struct App : fx::App {
 
-    int  scale_x = 4;
-    int  scale_y = 8;
-    int  offset  = 0;
-    int  bar     = 24;
+    int  scale_x  = 4;
+    int  scale_y  = 8;
+    int  offset   = 0;
+    int  bar      = 56;
     bool show_bar = true;
 
     void init() override {
-        //SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, 1024, 0, 0, &audio_callback };
         SDL_AudioSpec spec = { MIXRATE, AUDIO_S16, 2, 0, SAMPLES_PER_FRAME, 0, 0, &audio_callback };
         SDL_OpenAudio(&spec, nullptr);
         SDL_PauseAudio(0);
     }
 
-    const char* title() const { return "nsf-monitor"; }
+    const char* title() const override { return "nsf-monitor"; }
 
     void key(int code) override {
         const Uint8* ks = SDL_GetKeyboardState(nullptr);
@@ -353,8 +352,7 @@ struct App : fx::App {
         }
 
 
-
-        for (int p = -48; p < 50; ++p) {
+        for (int p = -36; p < 50; ++p) {
 
             int c = "101201011010"[(p + 120) % 12] - '0';
             c = 10 + c * 20;
@@ -365,7 +363,7 @@ struct App : fx::App {
 
         }
 
-         for (int n = start_frame; n < start_frame + frames_per_screen; ++n) {
+        for (int n = start_frame; n < start_frame + frames_per_screen; ++n) {
             if (n >= (int) record.states.size()) break;
             auto const& state = record.states[n];
 
@@ -391,7 +389,7 @@ struct App : fx::App {
                     vol = state.reg[0x8] & 0x7f ? 0xa : 0;
                 }
 
-                int v = 255 * std::pow(vol / 15.0, 0.5);
+                int v = 255 * std::pow(vol / 15.0, 0.8);
                 if (i == 0) fx::set_color(v, v/3, v/3);
                 if (i == 1) fx::set_color(v/3, v, v/3);
                 if (i == 2) fx::set_color(v/3, v/3, v);
@@ -421,12 +419,22 @@ struct App : fx::App {
                 if (!is_const) {
                     if (state.is_set[0xf]) vol = 0xf;
                 }
-                int  v      = 200 * std::pow(vol / 15.0, 0.5);
+                int v = 200 * std::pow(vol / 15.0, 0.5);
                 if (mode) fx::set_color(v / 3, v, v);
                 else      fx::set_color(v, v, v);
 
                 int y = (period - 49) * scale_y + fx::screen_height() / 2;
                 fx::draw_rectangle(true, x, y, scale_x, 1 + scale_y - 2);
+            }
+
+            // dmc
+            if (active[4]) {
+                if (state.is_set[0x10]) {
+                    int period = state.reg[0x10] & 0xf;
+                    int y = (period - 49) * scale_y + fx::screen_height() / 2;
+                    fx::set_color(200, 200, 0);
+                    fx::draw_rectangle(true, x, y, scale_x, 1 + scale_y - 2);
+                }
             }
 
          }
@@ -438,10 +446,24 @@ struct App : fx::App {
         // state
         auto const& state = record.states[f];
         for (int i = 0; i < 22; ++i) {
-            if (i / 4 < 5 && !active[i / 4]) continue;
+            int chan = std::min(i / 4, 4);
+            if (!active[chan]) continue;
             if (state.is_set[i]) fx::set_font_color(250, 250, 250);
             else                 fx::set_font_color(150, 150, 150);
-            fx::printf(i % 4 * 48 + 8, fx::screen_height() - (6 - i / 4) * 24, "%02X", state.reg[i]);
+            int x = (i - chan * 4) * 48 + 8;
+            int y = fx::screen_height() - (5 - chan) * 24;
+            fx::printf(x, y, "%02X", state.reg[i]);
+        }
+
+        fx::printf(8 + 16 * 12, fx::screen_height() - 24 * 6, "DVCL");
+        for (int i = 0; i < 2; ++i) {
+            if (!active[i]) continue;
+            uint8_t v = state.reg[i * 4];
+            int  duty      = v >> 6;
+            int  vol       = v & 0x0f;
+            bool const_vol = !!(v & 0x10);
+            bool loop      = !!(v & 0x20);
+            fx::printf(8 + 16 * 12, fx::screen_height() - 24 * 5 + i * 24, "%0X%0X%0X%0X", duty, vol, const_vol, loop);
         }
 
         fx::set_font_color(250, 250, 250);
